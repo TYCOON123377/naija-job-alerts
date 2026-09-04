@@ -1,0 +1,31 @@
+# Naija Job Alerts configuration
+#
+# keywords: a job title/description matching ANY of these (case-insensitive)
+# is considered a candidate match.
+keywords:
+  - "software engineer"
+  - "developer"
+  - "data analyst"
+  - "customer service"
+  - "accountant"
+
+# locations: if a job entry mentions any of these, it's kept. Leave empty
+# to disable location filtering (keyword match alone is enough).
+locations:
+  - "Lagos"
+  - "Abuja"
+  - "Port Harcourt"
+  - "Remote"
+
+# RSS/Atom feeds to poll for new listings. Add or remove feeds as needed.
+feeds:
+  - name: "HotNigerianJobs"
+    url: "https://www.hotnigerianjobs.com/hotnigerianjobs/feed/"
+  - name: "MyJobMag"
+    url: "https://www.myjobmag.com/rss/jobs.xml"
+  - name: "JobgurusNigeria"
+    url: "https://jobgurus.com.ng/feed/"
+
+# Where to persist the set of job links/ids already alerted on, so the
+# same listing isn't emailed/messaged twice.
+seen_jobs_file: "data/seen_jobs.json"
