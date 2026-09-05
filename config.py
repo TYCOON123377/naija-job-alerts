@@ -1,0 +1,92 @@
+"""
+Config and constants for Naija Job Alerts bot.
+"""
+import os
+
+# Set this as an environment variable, never hardcode it.
+# Get a free token from @BotFather on Telegram.
+BOT_TOKEN = os.environ.get("JOB_BOT_TOKEN", "")
+
+# How often to poll the job feeds, in minutes.
+POLL_INTERVAL_MINUTES = 15
+
+# A job older than this is never alerted on, even if the bot has never seen
+# it before (guards against feed backfills / reordered entries surfacing
+# stale postings as "new").
+MAX_JOB_AGE_HOURS = 6
+
+# If a single poll produces more matches than this for one user, send them
+# as one digest message instead of one message each — keeps things from
+# feeling spammy and stays well under Telegram's per-chat flood limits.
+DIGEST_THRESHOLD = 4
+
+# Seconds to wait between individual Telegram sends. Telegram's real limit
+# is roughly 30 messages/second globally and ~1/second per chat; this is
+# deliberately conservative since we're on a free/shared IP.
+SEND_DELAY_SECONDS = 0.05
+
+# Free, live, real-time RSS feeds. MyJobMag confirmed working as of testing.
+# Add more free feeds here as you validate them (e.g. HotNigerianJobs, if its
+# feed is confirmed live too).
+JOB_FEEDS = [
+    {
+        "url": "https://www.myjobmag.com/feeds/ng/jobsxml.xml",
+        "region": "nigeria",
+        "source_name": "MyJobMag",
+    },
+    {
+        "url": "https://www.myjobmag.com/feeds/ng/jobsxml_by_categories.xml",
+        "region": "nigeria",
+        "source_name": "MyJobMag",
+    },
+    {
+        "url": "https://www.hotnigerianjobs.com/feed/rss.xml",
+        "region": "nigeria",
+        "source_name": "HotNigerianJobs",
+    },
+    {
+        "url": "https://weworkremotely.com/remote-jobs.rss",
+        "region": "remote",
+        "source_name": "We Work Remotely",
+    },
+    # Deliberately NOT including Remotive: their feed terms explicitly
+    # prohibit using it to "collect signups... to show a listing" and
+    # forbid resubmitting their jobs to platforms like LinkedIn Jobs —
+    # which is exactly what this bot does. Respect the terms, skip the
+    # source, rather than build on borrowed time.
+]
+
+NIGERIAN_STATES = [
+    "Abia", "Abuja", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa",
+    "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti",
+    "Enugu", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi",
+    "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun",
+    "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara",
+    "Remote",
+]
+
+DB_PATH = os.path.join(os.path.dirname(__file__), "data", "jobs.db")
+
+# Owner-only command — set this to your own Telegram chat_id so /stats
+# doesn't leak usage numbers to every subscriber. Find your chat_id by
+# messaging @userinfobot on Telegram. Leave as None to disable /stats.
+ADMIN_CHAT_ID = None  # e.g. 123456789
+
+# Optional: a healthchecks.io "ping URL" for dead-man's-switch monitoring
+# of the always-on command bot (see README → "Uptime monitoring").
+# Free tier, no card required. Leave blank to disable.
+HEALTHCHECK_PING_URL = os.environ.get("HEALTHCHECK_PING_URL", "")
+HEALTHCHECK_PING_INTERVAL_MINUTES = 10
+
+# Preset keyword bundles for the /categories inline-button flow — lowers
+# the barrier for users who don't want to type exact keyword syntax.
+CATEGORY_KEYWORDS = {
+    "tech": ("💻 Tech / IT", "developer, software, IT, engineer, programmer, data"),
+    "sales": ("📈 Sales / Marketing", "sales, marketing, business development, digital marketing"),
+    "admin": ("🗂️ Admin / Office", "admin, secretary, office assistant, executive assistant"),
+    "customer_service": ("☎️ Customer Service", "customer service, customer support, call center"),
+    "finance": ("💰 Finance / Accounting", "accounting, finance, audit, bookkeeping, accountant"),
+    "healthcare": ("🏥 Healthcare", "nurse, medical, healthcare, pharmacist, hospital"),
+    "education": ("📚 Education", "teacher, education, lecturer, tutor, school"),
+    "engineering": ("🔧 Engineering", "engineer, engineering, technical, mechanical, civil"),
+}

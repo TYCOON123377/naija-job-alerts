@@ -1,0 +1,42 @@
+name: poll-job-feeds
+
+on:
+  schedule:
+    # Every 15 minutes, offset to :04/:19/:34/:49 rather than the exact
+    # quarter-hour — GitHub deprioritizes scheduled runs that land on the
+    # most common cron boundaries (:00/:15/:30/:45), so runs can get
+    # dropped or delayed under platform load. Offsetting avoids that.
+    - cron: "4,19,34,49 * * * *"
+  workflow_dispatch: {}  # lets you trigger a run manually from the Actions tab
+
+# Keep this repo PUBLIC for unlimited free Actions minutes. If it must be
+# private, this schedule (~96 runs/day, well under a minute each) still
+# fits comfortably inside the 2,000 free minutes/month private repos get.
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run one poll cycle
+        env:
+          JOB_BOT_TOKEN: ${{ secrets.JOB_BOT_TOKEN }}
+        run: python poll_once.py
+
+      - name: Commit updated job database
+        run: |
+          git config user.name "job-alerts-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/jobs.db
+          git diff --staged --quiet && echo "No DB changes to commit" || git commit -m "Update seen-jobs state [skip ci]"
+          git push

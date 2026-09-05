@@ -1,0 +1,37 @@
+name: weekly-still-here-digest
+
+on:
+  schedule:
+    # Sundays at 09:04 UTC (~10:04 WAT). Offset off the exact hour for the
+    # same reason as poll.yml — avoids GitHub's scheduler deprioritizing
+    # runs on common time boundaries.
+    - cron: "4 9 * * 0"
+  workflow_dispatch: {}
+
+jobs:
+  weekly-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Send weekly digest
+        env:
+          JOB_BOT_TOKEN: ${{ secrets.JOB_BOT_TOKEN }}
+        run: python weekly_digest.py
+
+      - name: Commit updated job database
+        run: |
+          git config user.name "job-alerts-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/jobs.db
+          git diff --staged --quiet && echo "No DB changes to commit" || git commit -m "Update state after weekly digest [skip ci]"
+          git push
