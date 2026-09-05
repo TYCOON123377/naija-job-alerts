@@ -65,7 +65,10 @@ NIGERIAN_STATES = [
     "Remote",
 ]
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "data", "jobs.db")
+# Overridable so the Vercel-hosted command bot can point this at /tmp
+# (its filesystem is read-only everywhere else) while poll_once.py, running
+# on GitHub Actions, keeps using the checked-out repo path.
+DB_PATH = os.environ.get("JOBS_DB_PATH") or os.path.join(os.path.dirname(__file__), "data", "jobs.db")
 
 # Owner-only command — set this to your own Telegram chat_id so /stats
 # doesn't leak usage numbers to every subscriber. Find your chat_id by

@@ -291,14 +291,16 @@ async def send_heartbeat(context: ContextTypes.DEFAULT_TYPE):
         logger.exception("Heartbeat ping failed (network issue, not necessarily bot failure)")
 
 
-def main():
+def build_application():
+    """Builds the Application with all command handlers registered, but
+    doesn't start it — shared by main() (long-polling) and the Vercel
+    webhook handler (one-shot per-request processing), which each drive
+    the resulting Application differently."""
     if not BOT_TOKEN:
         raise SystemExit(
             "JOB_BOT_TOKEN environment variable is not set. "
             "Get a free token from @BotFather on Telegram and export it."
         )
-
-    storage.init_db()
 
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -315,6 +317,12 @@ def main():
     app.add_handler(CommandHandler("resume", resume))
     app.add_handler(CommandHandler("deleteme", deleteme))
     app.add_handler(CommandHandler("stats", stats))
+    return app
+
+
+def main():
+    storage.init_db()
+    app = build_application()
 
     if HEALTHCHECK_PING_URL:
         if app.job_queue is not None:
