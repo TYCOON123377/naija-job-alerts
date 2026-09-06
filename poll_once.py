@@ -20,8 +20,15 @@ from datetime import datetime, timedelta, timezone
 from telegram import Bot
 
 import storage
-from config import BOT_TOKEN, DIGEST_THRESHOLD, GREENHOUSE_BOARDS, JOB_FEEDS, SEND_DELAY_SECONDS
-from fetcher import fetch_greenhouse_jobs, fetch_new_jobs
+from config import (
+    BOT_TOKEN,
+    DIGEST_THRESHOLD,
+    GREENHOUSE_BOARDS,
+    JOB_FEEDS,
+    SEND_DELAY_SECONDS,
+    TELEGRAM_CHANNELS,
+)
+from fetcher import fetch_greenhouse_jobs, fetch_new_jobs, fetch_telegram_jobs
 from matcher import (
     job_matches_user,
     format_job_message,
@@ -102,7 +109,7 @@ async def run_once():
     if skipped:
         logger.info("Skipping %d throttled source(s) not due yet this run.", skipped)
 
-    jobs = fetch_new_jobs(feeds) + fetch_greenhouse_jobs(boards)
+    jobs = fetch_new_jobs(feeds) + fetch_greenhouse_jobs(boards) + fetch_telegram_jobs(TELEGRAM_CHANNELS)
     for feed in feeds:
         if feed.get("min_interval_minutes"):
             storage.set_feed_last_fetched(_feed_key(feed), now)

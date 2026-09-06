@@ -2,6 +2,7 @@
 Fetches and parses job listings from free RSS feeds.
 """
 import calendar
+import html
 import json
 import logging
 import re
@@ -161,5 +162,84 @@ def fetch_greenhouse_jobs(boards):
                 "published_epoch": published_epoch,
                 "region": board["region"],
                 "source_name": board["source_name"],
+            }
+    return list(jobs.values())
+
+
+def fetch_telegram_jobs(channels):
+    """
+    Scrapes each channel's public share-preview page (t.me/s/<channel>) —
+    the same static HTML Telegram serves for link previews and embeds, no
+    login or API token needed. This is the most fragile source here: it's
+    unofficial (no documented API for it), so a Telegram page-layout change
+    could silently break parsing. Falls back to logging and skipping a
+    channel on any fetch/parse problem, same as a bad RSS feed.
+
+    Only returns the ~20 most recent messages the preview page renders —
+    fine for 15-minute polling, no deep backlog available.
+
+    Each channel dict is one of config.TELEGRAM_CHANNELS: {channel, region}.
+    Message text has no structured title/company/location fields, so the
+    first line becomes the job "title" and the rest the "description" —
+    good enough for keyword matching, messier for display than the
+    RSS/API sources.
+    """
+    jobs = {}
+    for ch in channels:
+        channel = ch["channel"]
+        url = f"https://t.me/s/{channel}"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                page = resp.read().decode("utf-8", errors="replace")
+        except urllib.error.URLError:
+            logger.exception("Error fetching Telegram channel: %s", channel)
+            continue
+
+        posts = list(re.finditer(r'data-post="([^"]+)"', page))
+        for i, post_match in enumerate(posts):
+            post_id = post_match.group(1)
+            chunk_start = post_match.end()
+            chunk_end = posts[i + 1].start() if i + 1 < len(posts) else len(page)
+            chunk = page[chunk_start:chunk_end]
+
+            text_match = re.search(
+                r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>',
+                chunk, re.DOTALL,
+            )
+            if not text_match:
+                continue
+            text = re.sub(r"<br\s*/?>", "\n", text_match.group(1))
+            text = re.sub(r"<[^>]+>", "", text)
+            text = html.unescape(text)
+            # Posts often glue an application URL onto the same line as the
+            # title with no separator — strip URLs so the title stays
+            # readable. The Telegram message link (job["link"]) already
+            # gets people to the original post and its real apply link.
+            text = re.sub(r"https?://\S+", "", text)
+            lines = [line.strip() for line in text.splitlines() if line.strip()]
+            if not lines:
+                continue
+
+            time_match = re.search(r'<time[^>]*datetime="([^"]+)"', chunk)
+            published = time_match.group(1) if time_match else ""
+            published_epoch = None
+            if published:
+                try:
+                    published_epoch = int(datetime.fromisoformat(published).timestamp())
+                except (TypeError, ValueError):
+                    published_epoch = None
+
+            guid = f"telegram:{post_id}"
+            jobs[guid] = {
+                "guid": guid,
+                "title": lines[0][:200],
+                "link": f"https://t.me/{post_id}",
+                "industry": "",
+                "description": " ".join(lines[1:]),
+                "published": published,
+                "published_epoch": published_epoch,
+                "region": ch["region"],
+                "source_name": f"Telegram: @{channel}",
             }
     return list(jobs.values())

@@ -118,6 +118,20 @@ GREENHOUSE_BOARDS = [
     # Figma (Greenhouse board has zero remote-only listings, nothing to add).
 ]
 
+# Public Telegram channels whose share-preview page (t.me/s/<channel>) we
+# scrape for job posts — see fetcher.fetch_telegram_jobs for why this is
+# the most fragile source in this file (unofficial HTML, not an API).
+# region is a best-effort single label per channel even though a couple of
+# these mix Nigeria and remote posts — a user with /region both sees
+# everything regardless, so this only affects users who filter strictly.
+TELEGRAM_CHANNELS = [
+    {"channel": "jbtoday", "region": "nigeria"},
+    {"channel": "jobsnigeria001rekrutconsulting", "region": "nigeria"},
+    {"channel": "jobnetworkng", "region": "nigeria"},
+    {"channel": "workanigeria", "region": "remote"},
+    {"channel": "remotejobss", "region": "remote"},
+]
+
 NIGERIAN_STATES = [
     "Abia", "Abuja", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa",
     "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti",
