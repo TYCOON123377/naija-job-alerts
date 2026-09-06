@@ -74,6 +74,50 @@ JOB_FEEDS = [
     # borrowed time.
 ]
 
+# Companies whose public Greenhouse job board we pull directly — this is
+# Greenhouse's own documented public Job Board API (boards-api.greenhouse.io),
+# not scraping, so it carries none of the redistribution-terms risk the RSS
+# aggregators above do. Greenhouse doesn't publish a numeric rate limit but
+# asks integrators not to hammer it, hence min_interval_minutes here too.
+#
+# remote_only=True drops onsite/hybrid postings for companies whose board
+# mixes both, so region="remote" means the same thing it does for the RSS
+# feeds above (genuinely remote, not hybrid) rather than "this company has
+# a remote policy somewhere on their board."
+GREENHOUSE_BOARDS = [
+    {
+        "slug": "moniepoint",
+        "region": "nigeria",
+        "source_name": "Moniepoint",
+        "remote_only": False,
+        "min_interval_minutes": 120,
+    },
+    {
+        "slug": "gitlab",
+        "region": "remote",
+        "source_name": "GitLab",
+        "remote_only": True,
+        "min_interval_minutes": 120,
+    },
+    {
+        "slug": "stripe",
+        "region": "remote",
+        "source_name": "Stripe",
+        "remote_only": True,
+        "min_interval_minutes": 120,
+    },
+    {
+        "slug": "webflow",
+        "region": "remote",
+        "source_name": "Webflow",
+        "remote_only": True,
+        "min_interval_minutes": 120,
+    },
+    # Checked and skipped: Flutterwave, Paystack, Andela, Kuda, Interswitch,
+    # PalmPay, OPay (none run Greenhouse or Lever — no public API found);
+    # Figma (Greenhouse board has zero remote-only listings, nothing to add).
+]
+
 NIGERIAN_STATES = [
     "Abia", "Abuja", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa",
     "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti",

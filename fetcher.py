@@ -2,9 +2,13 @@
 Fetches and parses job listings from free RSS feeds.
 """
 import calendar
+import json
 import logging
 import re
 import time
+import urllib.error
+import urllib.request
+from datetime import datetime
 
 import feedparser
 
@@ -95,4 +99,67 @@ def fetch_new_jobs(feeds=None):
                     seen_titles.add(norm_title)
         except Exception:
             logger.exception("Error fetching feed: %s", feed_url)
+    return list(jobs.values())
+
+
+def fetch_greenhouse_jobs(boards):
+    """
+    Pulls each company's public Greenhouse Job Board API
+    (boards-api.greenhouse.io) and returns job dicts in the same shape as
+    fetch_new_jobs(), so poll_once.py can treat both lists identically.
+
+    Each board dict is one of config.GREENHOUSE_BOARDS: {slug, region,
+    source_name, remote_only}. remote_only drops any posting whose location
+    doesn't contain "remote" (or does contain "hybrid") — see the comment
+    above GREENHOUSE_BOARDS for why.
+
+    Greenhouse gives each posting's last-updated time, not its original
+    post date — used here as published_epoch anyway since for a job never
+    seen before, "last updated" and "first posted" are the same moment in
+    the overwhelming majority of cases. (An old, quietly-edited posting
+    could look falsely fresh, but storage's seen-jobs tracking means that
+    only matters the very first time this bot ever sees that job.)
+    """
+    jobs = {}
+    for board in boards:
+        slug = board["slug"]
+        url = f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true"
+        try:
+            with urllib.request.urlopen(url, timeout=15) as resp:
+                data = json.loads(resp.read().decode())
+        except (urllib.error.URLError, ValueError):
+            logger.exception("Error fetching Greenhouse board: %s", slug)
+            continue
+
+        for entry in data.get("jobs", []):
+            location = (entry.get("location") or {}).get("name", "") or ""
+            if board.get("remote_only"):
+                loc_lower = location.lower()
+                if "remote" not in loc_lower or "hybrid" in loc_lower:
+                    continue
+
+            guid = f"greenhouse:{slug}:{entry['id']}"
+
+            published_epoch = None
+            updated_at = entry.get("updated_at")
+            if updated_at:
+                try:
+                    published_epoch = int(datetime.fromisoformat(updated_at).timestamp())
+                except (TypeError, ValueError):
+                    published_epoch = None
+
+            description = re.sub(r"<[^>]+>", " ", entry.get("content") or "")
+            description = re.sub(r"\s+", " ", description).strip()
+
+            jobs[guid] = {
+                "guid": guid,
+                "title": (entry.get("title") or "").strip(),
+                "link": entry.get("absolute_url", ""),
+                "industry": location,
+                "description": description,
+                "published": updated_at or "",
+                "published_epoch": published_epoch,
+                "region": board["region"],
+                "source_name": board["source_name"],
+            }
     return list(jobs.values())

@@ -20,8 +20,8 @@ from datetime import datetime, timedelta, timezone
 from telegram import Bot
 
 import storage
-from config import BOT_TOKEN, DIGEST_THRESHOLD, JOB_FEEDS, SEND_DELAY_SECONDS
-from fetcher import fetch_new_jobs
+from config import BOT_TOKEN, DIGEST_THRESHOLD, GREENHOUSE_BOARDS, JOB_FEEDS, SEND_DELAY_SECONDS
+from fetcher import fetch_greenhouse_jobs, fetch_new_jobs
 from matcher import (
     job_matches_user,
     format_job_message,
@@ -40,20 +40,30 @@ logger = logging.getLogger(__name__)
 WAT = timezone(timedelta(hours=1))  # West Africa Time, UTC+1, no DST
 
 
-def _due_feeds(now):
-    """Feeds due to be fetched this run — everything without a
-    min_interval_minutes, plus any throttled feed (like Jobicy, whose terms
-    ask for a few polls a day rather than one every 15 minutes) whose
-    interval has actually elapsed since its last fetch."""
+def _due(sources, now, key_fn):
+    """Sources due to be pulled this run — everything without a
+    min_interval_minutes, plus any throttled source (like Jobicy's feed or
+    the Greenhouse boards, whose terms ask for infrequent polling rather
+    than one hit every 15 minutes) whose interval has actually elapsed
+    since its last fetch. Shared between config.JOB_FEEDS (keyed by url)
+    and config.GREENHOUSE_BOARDS (keyed by slug) via key_fn."""
     due = []
-    for feed in JOB_FEEDS:
-        min_interval = feed.get("min_interval_minutes")
+    for source in sources:
+        min_interval = source.get("min_interval_minutes")
         if min_interval:
-            last = storage.get_feed_last_fetched(feed["url"])
+            last = storage.get_feed_last_fetched(key_fn(source))
             if last and (now - last) < min_interval * 60:
                 continue
-        due.append(feed)
+        due.append(source)
     return due
+
+
+def _feed_key(feed):
+    return feed["url"]
+
+
+def _board_key(board):
+    return f"greenhouse:{board['slug']}"
 
 
 async def _send_matches(bot, user, matches):
@@ -86,15 +96,19 @@ async def run_once():
     bot = Bot(token=BOT_TOKEN)
 
     now = time.time()
-    feeds = _due_feeds(now)
-    skipped = len(JOB_FEEDS) - len(feeds)
+    feeds = _due(JOB_FEEDS, now, _feed_key)
+    boards = _due(GREENHOUSE_BOARDS, now, _board_key)
+    skipped = (len(JOB_FEEDS) - len(feeds)) + (len(GREENHOUSE_BOARDS) - len(boards))
     if skipped:
-        logger.info("Skipping %d throttled feed(s) not due yet this run.", skipped)
+        logger.info("Skipping %d throttled source(s) not due yet this run.", skipped)
 
-    jobs = fetch_new_jobs(feeds)
+    jobs = fetch_new_jobs(feeds) + fetch_greenhouse_jobs(boards)
     for feed in feeds:
         if feed.get("min_interval_minutes"):
-            storage.set_feed_last_fetched(feed["url"], now)
+            storage.set_feed_last_fetched(_feed_key(feed), now)
+    for board in boards:
+        if board.get("min_interval_minutes"):
+            storage.set_feed_last_fetched(_board_key(board), now)
 
     if not storage.has_any_seen_jobs():
         storage.mark_jobs_seen_bulk([j["guid"] for j in jobs])
