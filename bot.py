@@ -99,6 +99,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Hey! 👋 I'm Naija Job Alerts — free real-time job alerts from 14 "
         "sources across Nigeria, remote work, and freelance gigs.\n\n"
+        "Forged by Mr. Oluwatosin Anifowose 👑 — built free, for the people, "
+        "so nobody misses their shot at a job because they didn't refresh "
+        "fast enough.\n\n"
         "Let's get you set up, just answer like you're texting a friend.\n\n"
         "What kind of jobs are you looking for? (e.g. developer, sales, "
         "accounting — or say \"anything\" if you're not picky)"
