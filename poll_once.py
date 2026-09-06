@@ -14,12 +14,13 @@ Usage:
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 
 from telegram import Bot
 
 import storage
-from config import BOT_TOKEN, DIGEST_THRESHOLD, SEND_DELAY_SECONDS
+from config import BOT_TOKEN, DIGEST_THRESHOLD, JOB_FEEDS, SEND_DELAY_SECONDS
 from fetcher import fetch_new_jobs
 from matcher import (
     job_matches_user,
@@ -37,6 +38,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 WAT = timezone(timedelta(hours=1))  # West Africa Time, UTC+1, no DST
+
+
+def _due_feeds(now):
+    """Feeds due to be fetched this run — everything without a
+    min_interval_minutes, plus any throttled feed (like Jobicy, whose terms
+    ask for a few polls a day rather than one every 15 minutes) whose
+    interval has actually elapsed since its last fetch."""
+    due = []
+    for feed in JOB_FEEDS:
+        min_interval = feed.get("min_interval_minutes")
+        if min_interval:
+            last = storage.get_feed_last_fetched(feed["url"])
+            if last and (now - last) < min_interval * 60:
+                continue
+        due.append(feed)
+    return due
 
 
 async def _send_matches(bot, user, matches):
@@ -68,7 +85,16 @@ async def run_once():
     storage.init_db()
     bot = Bot(token=BOT_TOKEN)
 
-    jobs = fetch_new_jobs()
+    now = time.time()
+    feeds = _due_feeds(now)
+    skipped = len(JOB_FEEDS) - len(feeds)
+    if skipped:
+        logger.info("Skipping %d throttled feed(s) not due yet this run.", skipped)
+
+    jobs = fetch_new_jobs(feeds)
+    for feed in feeds:
+        if feed.get("min_interval_minutes"):
+            storage.set_feed_last_fetched(feed["url"], now)
 
     if not storage.has_any_seen_jobs():
         storage.mark_jobs_seen_bulk([j["guid"] for j in jobs])

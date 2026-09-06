@@ -24,9 +24,10 @@ def _normalize_title(title):
     return t
 
 
-def fetch_new_jobs():
+def fetch_new_jobs(feeds=None):
     """
-    Pulls every configured feed and returns a de-duplicated list of job dicts:
+    Pulls every feed in `feeds` (defaults to every configured feed) and
+    returns a de-duplicated list of job dicts:
       { guid, title, link, industry, description, published, published_epoch,
         region, source_name }
 
@@ -48,10 +49,13 @@ def fetch_new_jobs():
     date, else None — callers should treat None conservatively (see
     matcher.is_fresh).
     """
+    if feeds is None:
+        feeds = JOB_FEEDS
+
     jobs = {}
     seen_titles = set()
 
-    for feed in JOB_FEEDS:
+    for feed in feeds:
         feed_url = feed["url"]
         try:
             parsed = feedparser.parse(feed_url)

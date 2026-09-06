@@ -39,6 +39,12 @@ def init_db():
                 queued_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS feed_state (
+                url TEXT PRIMARY KEY,
+                last_fetched_epoch INTEGER
+            )
+        """)
         # Migrations for DBs created before these columns existed.
         cols = [r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
         if "region" not in cols:
@@ -184,6 +190,25 @@ def update_last_notified(chat_id):
     with get_conn() as conn:
         conn.execute(
             "UPDATE users SET last_notified_at=CURRENT_TIMESTAMP WHERE chat_id=?", (chat_id,)
+        )
+        conn.commit()
+
+
+def get_feed_last_fetched(url):
+    """Epoch seconds of the last successful fetch of this feed, or None if
+    it's never been fetched — used to throttle feeds whose terms ask for
+    less-frequent polling than the rest (see config.JOB_FEEDS)."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT last_fetched_epoch FROM feed_state WHERE url=?", (url,)).fetchone()
+        return row["last_fetched_epoch"] if row else None
+
+
+def set_feed_last_fetched(url, epoch):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO feed_state (url, last_fetched_epoch) VALUES (?, ?) "
+            "ON CONFLICT(url) DO UPDATE SET last_fetched_epoch=excluded.last_fetched_epoch",
+            (url, epoch),
         )
         conn.commit()
 

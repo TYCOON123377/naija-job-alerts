@@ -49,11 +49,29 @@ JOB_FEEDS = [
         "region": "remote",
         "source_name": "We Work Remotely",
     },
-    # Deliberately NOT including Remotive: their feed terms explicitly
-    # prohibit using it to "collect signups... to show a listing" and
-    # forbid resubmitting their jobs to platforms like LinkedIn Jobs —
-    # which is exactly what this bot does. Respect the terms, skip the
-    # source, rather than build on borrowed time.
+    {
+        "url": "https://www.jobzilla.ng/feed",
+        "region": "nigeria",
+        "source_name": "Jobzilla",
+    },
+    {
+        # Jobicy's terms explicitly allow this kind of use if we keep
+        # attribution and the original job link (both already true — see
+        # matcher.format_job_message), but their feed's own legal notice
+        # asks integrators to poll "a few times daily", not every 15
+        # minutes like the rest of these feeds. min_interval_minutes below
+        # is what makes poll_once.py respect that (see storage.feed_state).
+        "url": "https://jobicy.com/?feed=job_feed",
+        "region": "remote",
+        "source_name": "Jobicy",
+        "min_interval_minutes": 240,
+    },
+    # Deliberately NOT including Remotive or Himalayas: both feeds' terms
+    # explicitly prohibit resubmitting their jobs to third-party platforms
+    # (Remotive names LinkedIn Jobs; Himalayas names Jooble/Neuvoo/Google
+    # Jobs/LinkedIn Jobs as examples) — which is exactly what this bot
+    # does. Respect the terms, skip the source, rather than build on
+    # borrowed time.
 ]
 
 NIGERIAN_STATES = [
