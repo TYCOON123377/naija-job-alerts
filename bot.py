@@ -100,8 +100,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     storage.upsert_user(chat_id)
     storage.set_onboarding_step(chat_id, "keywords")
     await update.message.reply_text(
-        "Good day. I am 9.j.a, developed by Mr. Oluwatosin Anifowose to "
-        "give you a genuine fighting chance at securing employment.\n\n"
+        "Good day. I am 9.j.a, developed by Master Tosin to give you a "
+        "genuine fighting chance at securing employment.\n\n"
         "Allow me to explain what I can do for you: I monitor 14 sources "
         "at once — Nigerian job boards, Telegram job-alert channels, "
         "remote-first companies' own career pages, and freelance gigs — "
