@@ -53,7 +53,10 @@ from config import (
     HEALTHCHECK_PING_URL,
     HEALTHCHECK_PING_INTERVAL_MINUTES,
     CATEGORY_KEYWORDS,
+    RECENT_JOBS_DISPLAY_LIMIT,
+    RECENT_JOBS_WINDOW_HOURS,
 )
+from matcher import format_digest_message, job_matches_user
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -177,8 +180,9 @@ async def onboard_region_callback(update: Update, context: ContextTypes.DEFAULT_
     await query.edit_message_text(
         f"✅ All set! Region: {REGION_LABELS[region]}\n\n"
         "I'll ping you the moment something matches — usually within 15 minutes "
-        "of it going live. Send /status anytime to check your settings, /pause "
-        "to stop, or /help to see everything else I can do."
+        "of it going live. Want to see what's already out there? Send /recent.\n\n"
+        "Send /status anytime to check your settings, /pause to stop, or /help "
+        "to see everything else I can do."
     )
 
 
@@ -258,6 +262,36 @@ async def set_region(update: Update, context: ContextTypes.DEFAULT_TYPE):
     region = context.args[0].lower()
     storage.upsert_user(chat_id, region=region)
     await update.message.reply_text(f"✅ Region set to: {REGION_LABELS[region]}")
+
+
+async def recent(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """On-demand catch-up against a rolling cache poll_once.py fills in on
+    every run (storage.recent_jobs) — not a live re-fetch of all 14
+    sources, which would take way longer than a Telegram reply can wait
+    for. See RECENT_JOBS_WINDOW_HOURS for why this looks further back than
+    the auto-alert freshness cutoff."""
+    chat_id = update.effective_chat.id
+    user = storage.get_user(chat_id)
+    if user is None:
+        await update.message.reply_text("Send /start first so I know what you're looking for.")
+        return
+
+    jobs = storage.get_recent_jobs(RECENT_JOBS_WINDOW_HOURS)
+    matches = [j for j in jobs if job_matches_user(j, user)]
+
+    if not matches:
+        await update.message.reply_text(
+            f"No matches in the last {RECENT_JOBS_WINDOW_HOURS} hours for your current filters.\n"
+            "I'll ping you the moment something new comes in — or try loosening your "
+            "/keywords or /region."
+        )
+        return
+
+    await update.message.reply_text(
+        format_digest_message(matches, cap=RECENT_JOBS_DISPLAY_LIMIT),
+        parse_mode="HTML",
+        disable_web_page_preview=True,
+    )
 
 
 async def set_quiet(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -352,6 +386,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/categories — pick keywords from tappable buttons instead\n"
         "/location Lagos — filter by state (or 'any')\n"
         "/region nigeria|remote|freelance|both — filter by job origin\n"
+        "/recent — see matches from the last 48 hours right now\n"
         "/quiet 22 7 — set quiet hours (WAT), or /quiet off\n"
         "/status — see your current settings\n"
         "/pause — stop alerts without losing settings\n"
@@ -423,6 +458,7 @@ def build_application():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(CommandHandler("location", set_location))
     app.add_handler(CommandHandler("region", set_region))
+    app.add_handler(CommandHandler("recent", recent))
     app.add_handler(CommandHandler("quiet", set_quiet))
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("pause", pause))

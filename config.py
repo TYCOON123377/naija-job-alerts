@@ -25,6 +25,14 @@ DIGEST_THRESHOLD = 4
 # deliberately conservative since we're on a free/shared IP.
 SEND_DELAY_SECONDS = 0.05
 
+# How far back /recent looks. Deliberately wider than MAX_JOB_AGE_HOURS —
+# that cutoff is about not alerting on stale backfills the moment a feed is
+# first seen; /recent's job is instant gratification for someone who just
+# finished onboarding, so it's fine (good, even) to show them things
+# posted up to two days ago that they'd have otherwise never seen.
+RECENT_JOBS_WINDOW_HOURS = 48
+RECENT_JOBS_DISPLAY_LIMIT = 10
+
 # Free, live, real-time RSS feeds. MyJobMag confirmed working as of testing.
 # Add more free feeds here as you validate them (e.g. HotNigerianJobs, if its
 # feed is confirmed live too).

@@ -5,7 +5,9 @@ Tables:
   users(chat_id PRIMARY KEY, keywords, location, active)
   seen_jobs(guid PRIMARY KEY, first_seen)
 """
+import json
 import sqlite3
+import time
 from contextlib import contextmanager
 
 from config import DB_PATH
@@ -44,6 +46,13 @@ def init_db():
             CREATE TABLE IF NOT EXISTS feed_state (
                 url TEXT PRIMARY KEY,
                 last_fetched_epoch INTEGER
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS recent_jobs (
+                guid TEXT PRIMARY KEY,
+                job_json TEXT NOT NULL,
+                published_epoch INTEGER
             )
         """)
         # Migrations for DBs created before these columns existed.
@@ -193,6 +202,46 @@ def update_last_notified(chat_id):
     with get_conn() as conn:
         conn.execute(
             "UPDATE users SET last_notified_at=CURRENT_TIMESTAMP WHERE chat_id=?", (chat_id,)
+        )
+        conn.commit()
+
+
+def store_recent_jobs(jobs):
+    """Caches every fetched job (not just new ones) so /recent can show
+    on-demand matches instantly instead of re-fetching all 14 sources live
+    inside a single Telegram reply — some feeds take up to 15s each,
+    sequentially that's minutes, way past what a webhook response can wait
+    for. Populated by poll_once.py after every poll cycle."""
+    if not jobs:
+        return
+    with get_conn() as conn:
+        conn.executemany(
+            "INSERT INTO recent_jobs (guid, job_json, published_epoch) VALUES (?, ?, ?) "
+            "ON CONFLICT(guid) DO UPDATE SET job_json=excluded.job_json, published_epoch=excluded.published_epoch",
+            [(j["guid"], json.dumps(j), j.get("published_epoch")) for j in jobs],
+        )
+        conn.commit()
+
+
+def get_recent_jobs(max_age_hours):
+    cutoff = time.time() - max_age_hours * 3600
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT job_json FROM recent_jobs "
+            "WHERE published_epoch IS NOT NULL AND published_epoch >= ? "
+            "ORDER BY published_epoch DESC",
+            (cutoff,),
+        ).fetchall()
+    return [json.loads(r["job_json"]) for r in rows]
+
+
+def prune_old_recent_jobs(max_age_hours):
+    """Keeps recent_jobs bounded — same reasoning as prune_old_seen_jobs."""
+    cutoff = time.time() - max_age_hours * 3600
+    with get_conn() as conn:
+        conn.execute(
+            "DELETE FROM recent_jobs WHERE published_epoch IS NULL OR published_epoch < ?",
+            (cutoff,),
         )
         conn.commit()
 

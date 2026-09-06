@@ -28,6 +28,7 @@ from config import (
     GREENHOUSE_BOARDS,
     HEALTHCHECK_PING_URL,
     JOB_FEEDS,
+    RECENT_JOBS_WINDOW_HOURS,
     SEND_DELAY_SECONDS,
     TELEGRAM_CHANNELS,
 )
@@ -129,6 +130,8 @@ async def run_once():
         logger.info("Skipping %d throttled source(s) not due yet this run.", skipped)
 
     jobs = fetch_new_jobs(feeds) + fetch_greenhouse_jobs(boards) + fetch_telegram_jobs(TELEGRAM_CHANNELS)
+    storage.store_recent_jobs(jobs)
+    storage.prune_old_recent_jobs(RECENT_JOBS_WINDOW_HOURS)
     for feed in feeds:
         if feed.get("min_interval_minutes"):
             storage.set_feed_last_fetched(_feed_key(feed), now)
