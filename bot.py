@@ -100,14 +100,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     storage.upsert_user(chat_id)
     storage.set_onboarding_step(chat_id, "keywords")
     await update.message.reply_text(
-        "Hi, I'm 9ja Job Alerts 👋 — built by Mr. Oluwatosin Anifowose to "
-        "give you a fighting chance at securing employment.\n\n"
-        "What I can do: I watch 14 sources — Nigerian job boards, Telegram "
-        "job-alert channels, remote-first companies' own career pages, and "
-        "freelance gigs — and ping you the moment something matches what "
-        "you're looking for. Free, real-time, no spam.\n\n"
-        "What I need from you: just answer a couple of quick questions, "
-        "like you're texting a friend.\n\n"
+        "Good day. I am 9ja Job Alerts, developed by Mr. Oluwatosin "
+        "Anifowose to give you a genuine fighting chance at securing "
+        "employment.\n\n"
+        "Allow me to explain what I can do for you: I monitor 14 sources "
+        "at once — Nigerian job boards, Telegram job-alert channels, "
+        "remote-first companies' own career pages, and freelance gigs — "
+        "and I will notify you the instant something matches your "
+        "criteria. Free of charge, in real time, with no spam.\n\n"
+        "In return, I require only a few moments of your time to "
+        "understand what you're looking for. Shall we begin?\n\n"
         "What kind of jobs are you looking for? (e.g. developer, sales, "
         "accounting — or say \"anything\" if you're not picky)"
     )
