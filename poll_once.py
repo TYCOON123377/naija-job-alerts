@@ -15,6 +15,8 @@ import asyncio
 import json
 import logging
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timedelta, timezone
 
 from telegram import Bot
@@ -24,6 +26,7 @@ from config import (
     BOT_TOKEN,
     DIGEST_THRESHOLD,
     GREENHOUSE_BOARDS,
+    HEALTHCHECK_PING_URL,
     JOB_FEEDS,
     SEND_DELAY_SECONDS,
     TELEGRAM_CHANNELS,
@@ -73,6 +76,22 @@ def _board_key(board):
     return f"greenhouse:{board['slug']}"
 
 
+def _send_heartbeat():
+    """Pings a free healthchecks.io URL at the end of a successful run —
+    a dead-man's-switch so a silently-broken cron (expired GITHUB_TOKEN,
+    a source that starts erroring every run, GitHub Actions itself having
+    an outage) gets noticed instead of just... not alerting anyone,
+    indefinitely, with nothing to notice. Called only on success, not from
+    a finally block, so a real failure correctly shows up as a missed
+    check-in on healthchecks.io's side."""
+    if not HEALTHCHECK_PING_URL:
+        return
+    try:
+        urllib.request.urlopen(HEALTHCHECK_PING_URL, timeout=10)
+    except urllib.error.URLError:
+        logger.exception("Heartbeat ping failed (network issue, not necessarily a real failure).")
+
+
 async def _send_matches(bot, user, matches):
     """Sends a user's matches (digest above threshold, individual below),
     then clears their pending queue and stamps last_notified_at on success.
@@ -120,6 +139,7 @@ async def run_once():
     if not storage.has_any_seen_jobs():
         storage.mark_jobs_seen_bulk([j["guid"] for j in jobs])
         logger.info("First run — baselined %d existing jobs, no alerts sent.", len(jobs))
+        _send_heartbeat()
         return
 
     new_jobs = [j for j in jobs if not storage.is_job_seen(j["guid"])]
@@ -164,6 +184,7 @@ async def run_once():
     storage.prune_old_seen_jobs()
 
     logger.info("Poll cycle complete.")
+    _send_heartbeat()
 
 
 if __name__ == "__main__":

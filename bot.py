@@ -80,6 +80,7 @@ async def set_keywords(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text(
             "Send keywords separated by commas, e.g.:\n/keywords developer, accounting, remote\n\n"
+            "Prefix one with - to exclude it, e.g.:\n/keywords developer, -junior, -intern\n\n"
             "Not sure what to type? Try /categories to pick from common options instead."
         )
         return
@@ -240,7 +241,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Commands:\n"
         "/start — register\n"
-        "/keywords developer, sales, remote — set what jobs to match\n"
+        "/keywords developer, sales, -junior — set what jobs to match (prefix - to exclude)\n"
         "/categories — pick keywords from tappable buttons instead\n"
         "/location Lagos — filter by state (or 'any')\n"
         "/region nigeria|remote|freelance|both — filter by job origin\n"

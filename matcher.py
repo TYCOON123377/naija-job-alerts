@@ -44,6 +44,11 @@ def job_matches_user(job, user_row):
     Empty keywords/location means 'match everything' for that field.
     Matching is simple case-insensitive substring matching against the
     job's title, industry, and description — good enough for an MVP.
+
+    A keyword prefixed with "-" excludes rather than requires — e.g.
+    "developer, -junior" matches anything with "developer" that doesn't
+    also mention "junior". Exclude-only keywords (no plain ones at all)
+    mean "match everything except this", not "match nothing".
     """
     region_pref = (user_row["region"] or "both").strip().lower()
     if region_pref not in ("both", "") and job.get("region") != region_pref:
@@ -60,7 +65,12 @@ def job_matches_user(job, user_row):
 
     if keywords:
         kw_list = [k.strip().lower() for k in keywords.split(",") if k.strip()]
-        if not any(kw in haystack for kw in kw_list):
+        include = [k for k in kw_list if not k.startswith("-")]
+        exclude = [k[1:].strip() for k in kw_list if k.startswith("-") and k[1:].strip()]
+
+        if include and not any(kw in haystack for kw in include):
+            return False
+        if any(kw in haystack for kw in exclude):
             return False
 
     # Location filtering only makes sense for Nigeria-local jobs — a remote

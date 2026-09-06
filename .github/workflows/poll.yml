@@ -31,6 +31,7 @@ jobs:
       - name: Run one poll cycle
         env:
           JOB_BOT_TOKEN: ${{ secrets.JOB_BOT_TOKEN }}
+          HEALTHCHECK_PING_URL: ${{ secrets.HEALTHCHECK_PING_URL }}
         run: python poll_once.py
 
       - name: Commit updated job database
