@@ -100,15 +100,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     storage.upsert_user(chat_id)
     storage.set_onboarding_step(chat_id, "keywords")
     await update.message.reply_text(
-        "Hey, I'm Oluwatosin Anifowose 👋\n\n"
-        "I built this bot — Naija Job Alerts — because I was tired of "
-        "checking ten different sites just to find a job worth applying to. "
-        "It watches 14 sources across Nigeria, remote work, and freelance "
-        "gigs, and pings you the moment something matches.\n\n"
-        "It's free, it always will be, and I built it so that everyone has "
-        "a real shot at financial security, not just the people who know "
-        "where to look.\n\n"
-        "Let's get you set up, just answer like you're texting a friend.\n\n"
+        "Hi, I'm 9ja Job Alerts 👋 — built by Mr. Oluwatosin Anifowose to "
+        "give you a fighting chance at securing employment.\n\n"
+        "What I can do: I watch 14 sources — Nigerian job boards, Telegram "
+        "job-alert channels, remote-first companies' own career pages, and "
+        "freelance gigs — and ping you the moment something matches what "
+        "you're looking for. Free, real-time, no spam.\n\n"
+        "What I need from you: just answer a couple of quick questions, "
+        "like you're texting a friend.\n\n"
         "What kind of jobs are you looking for? (e.g. developer, sales, "
         "accounting — or say \"anything\" if you're not picky)"
     )
