@@ -184,10 +184,13 @@ async def onboard_region_callback(update: Update, context: ContextTypes.DEFAULT_
     await query.edit_message_text(
         f"✅ All set! Region: {REGION_LABELS[region]}\n\n"
         "I'll ping you the moment something matches — usually within 15 minutes "
-        "of it going live. Want to see what's already out there? Send /recent.\n\n"
+        "of it going live. Here's what's already out there for you:\n\n"
         "Send /status anytime to check your settings, /pause to stop, or /help "
         "to see everything else I can do."
     )
+
+    user = storage.get_user(chat_id)
+    await _send_recent_matches(chat_id, user, context)
 
 
 async def set_keywords(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -268,34 +271,43 @@ async def set_region(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ Region set to: {REGION_LABELS[region]}")
 
 
+async def _send_recent_matches(chat_id, user, context):
+    """Shared by /recent and the onboarding completion step — both are
+    "show me what's already out there" moments, one explicit and one
+    automatic. Reads from a rolling cache poll_once.py fills in on every
+    run (storage.recent_jobs), not a live re-fetch of all 14 sources,
+    which would take way longer than a Telegram reply can wait for. See
+    RECENT_JOBS_WINDOW_HOURS for why this looks further back than the
+    auto-alert freshness cutoff."""
+    jobs = storage.get_recent_jobs(RECENT_JOBS_WINDOW_HOURS)
+    matches = [j for j in jobs if job_matches_user(j, user)]
+
+    if not matches:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=(
+                f"No matches in the last {RECENT_JOBS_WINDOW_HOURS} hours for your current filters.\n"
+                "I'll ping you the moment something new comes in — or try loosening your "
+                "/keywords or /region."
+            ),
+        )
+        return
+
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=format_digest_message(matches, cap=RECENT_JOBS_DISPLAY_LIMIT),
+        parse_mode="HTML",
+        disable_web_page_preview=True,
+    )
+
+
 async def recent(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """On-demand catch-up against a rolling cache poll_once.py fills in on
-    every run (storage.recent_jobs) — not a live re-fetch of all 14
-    sources, which would take way longer than a Telegram reply can wait
-    for. See RECENT_JOBS_WINDOW_HOURS for why this looks further back than
-    the auto-alert freshness cutoff."""
     chat_id = update.effective_chat.id
     user = storage.get_user(chat_id)
     if user is None:
         await update.message.reply_text("Send /start first so I know what you're looking for.")
         return
-
-    jobs = storage.get_recent_jobs(RECENT_JOBS_WINDOW_HOURS)
-    matches = [j for j in jobs if job_matches_user(j, user)]
-
-    if not matches:
-        await update.message.reply_text(
-            f"No matches in the last {RECENT_JOBS_WINDOW_HOURS} hours for your current filters.\n"
-            "I'll ping you the moment something new comes in — or try loosening your "
-            "/keywords or /region."
-        )
-        return
-
-    await update.message.reply_text(
-        format_digest_message(matches, cap=RECENT_JOBS_DISPLAY_LIMIT),
-        parse_mode="HTML",
-        disable_web_page_preview=True,
-    )
+    await _send_recent_matches(chat_id, user, context)
 
 
 async def set_quiet(update: Update, context: ContextTypes.DEFAULT_TYPE):
