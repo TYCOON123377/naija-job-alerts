@@ -40,7 +40,7 @@ def is_fresh(job):
 def job_matches_user(job, user_row):
     """
     user_row has .keywords (comma-separated string), .location (string), and
-    .region ("nigeria", "remote", or "both"/empty for no filter).
+    .region ("nigeria", "remote", "freelance", or "both"/empty for no filter).
     Empty keywords/location means 'match everything' for that field.
     Matching is simple case-insensitive substring matching against the
     job's title, industry, and description — good enough for an MVP.
@@ -64,18 +64,24 @@ def job_matches_user(job, user_row):
             return False
 
     # Location filtering only makes sense for Nigeria-local jobs — a remote
-    # role isn't tied to a Nigerian state, so a "Lagos" filter shouldn't
-    # exclude a legitimately remote/worldwide posting.
-    if location and location.lower() != "any" and job.get("region") != "remote":
+    # role or a freelance project isn't tied to a Nigerian state, so a
+    # "Lagos" filter shouldn't exclude a legitimately worldwide posting.
+    if location and location.lower() != "any" and job.get("region") not in ("remote", "freelance"):
         if location.lower() not in haystack:
             return False
 
     return True
 
 
+_REGION_TAGS = {
+    "remote": "🌍 Remote",
+    "freelance": "💼 Freelance",
+}
+
+
 def format_job_message(job):
     industry = f" ({job['industry']})" if job.get("industry") else ""
-    tag = "🌍 Remote" if job.get("region") == "remote" else "🇳🇬"
+    tag = _REGION_TAGS.get(job.get("region"), "🇳🇬")
     source = f" — via {job['source_name']}" if job.get("source_name") else ""
     return (
         f"{tag} <b>{job['title']}</b>{industry}{source}\n"
@@ -90,7 +96,7 @@ def format_digest_message(jobs, cap=15):
     lines = [f"🆕 {len(jobs)} new jobs matching your alerts:\n"]
     for j in shown:
         industry = f" ({j['industry']})" if j.get("industry") else ""
-        tag = "🌍" if j.get("region") == "remote" else "🇳🇬"
+        tag = {"remote": "🌍", "freelance": "💼"}.get(j.get("region"), "🇳🇬")
         source = f" — via {j['source_name']}" if j.get("source_name") else ""
         lines.append(f"{tag} <b>{j['title']}</b>{industry}{source}\n  {j['link']}")
     if len(jobs) > cap:

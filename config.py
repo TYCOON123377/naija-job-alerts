@@ -55,6 +55,11 @@ JOB_FEEDS = [
         "source_name": "Jobzilla",
     },
     {
+        "url": "https://www.freelancer.com/rss.xml",
+        "region": "freelance",
+        "source_name": "Freelancer.com",
+    },
+    {
         # Jobicy's terms explicitly allow this kind of use if we keep
         # attribution and the original job link (both already true — see
         # matcher.format_job_message), but their feed's own legal notice

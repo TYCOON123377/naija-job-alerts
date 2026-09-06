@@ -24,7 +24,7 @@ Commands:
   /help                  - list all commands
   /keywords <comma,list>- set keyword filters (e.g. "developer, sales, remote")
   /location <state>     - set a Nigerian state filter, or "any"
-  /region <nigeria|remote|both> - filter Nigeria-only, remote-only, or both (default)
+  /region <nigeria|remote|freelance|both> - filter by job origin (default: both)
   /status                - show your current preferences
   /pause                 - stop receiving alerts
   /resume                - resume alerts
@@ -70,7 +70,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Set what you want:\n"
         "  /keywords developer, sales, remote\n"
         "  /location Lagos   (or /location any)\n"
-        "  /region nigeria   (or /region remote, or /region both — default)\n\n"
+        "  /region nigeria   (or /region remote, /region freelance, or /region both — default)\n\n"
         "Check anytime with /status. Pause with /pause, resume with /resume."
     )
 
@@ -132,11 +132,12 @@ async def set_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def set_region(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-    valid = {"nigeria", "remote", "both"}
+    valid = {"nigeria", "remote", "freelance", "both"}
     if not context.args or context.args[0].lower() not in valid:
         await update.message.reply_text(
             "Choose one: /region nigeria (Nigeria-based jobs only), "
             "/region remote (remote/international jobs only), "
+            "/region freelance (freelance projects only), "
             "or /region both (default — everything)."
         )
         return
@@ -145,7 +146,8 @@ async def set_region(update: Update, context: ContextTypes.DEFAULT_TYPE):
     labels = {
         "nigeria": "Nigeria-based jobs only 🇳🇬",
         "remote": "Remote/international jobs only 🌍",
-        "both": "Both Nigeria and remote jobs 🇳🇬🌍",
+        "freelance": "Freelance projects only 💼",
+        "both": "Everything (Nigeria, remote, and freelance) 🇳🇬🌍💼",
     }
     await update.message.reply_text(f"✅ Region set to: {labels[region]}")
 
@@ -241,7 +243,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/keywords developer, sales, remote — set what jobs to match\n"
         "/categories — pick keywords from tappable buttons instead\n"
         "/location Lagos — filter by state (or 'any')\n"
-        "/region nigeria|remote|both — filter by job origin\n"
+        "/region nigeria|remote|freelance|both — filter by job origin\n"
         "/quiet 22 7 — set quiet hours (WAT), or /quiet off\n"
         "/status — see your current settings\n"
         "/pause — stop alerts without losing settings\n"

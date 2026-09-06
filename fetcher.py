@@ -36,9 +36,9 @@ def fetch_new_jobs(feeds=None):
       { guid, title, link, industry, description, published, published_epoch,
         region, source_name }
 
-    region is "nigeria" or "remote" (set per-feed in config.JOB_FEEDS), used
-    downstream so users can filter to local jobs, remote/international jobs,
-    or both.
+    region is "nigeria", "remote", or "freelance" (set per-feed in
+    config.JOB_FEEDS), used downstream so users can filter to local jobs,
+    remote/international jobs, freelance projects, or everything.
 
     Deduplication happens on two levels:
       1. Exact guid match within a single feed (handled by the dict below).
