@@ -22,7 +22,8 @@ def init_db():
                 active INTEGER DEFAULT 1,
                 quiet_start INTEGER DEFAULT NULL,
                 quiet_end INTEGER DEFAULT NULL,
-                last_notified_at TEXT DEFAULT NULL
+                last_notified_at TEXT DEFAULT NULL,
+                onboarding_step TEXT DEFAULT NULL
             )
         """)
         conn.execute("""
@@ -55,6 +56,8 @@ def init_db():
             conn.execute("ALTER TABLE users ADD COLUMN quiet_end INTEGER DEFAULT NULL")
         if "last_notified_at" not in cols:
             conn.execute("ALTER TABLE users ADD COLUMN last_notified_at TEXT DEFAULT NULL")
+        if "onboarding_step" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN onboarding_step TEXT DEFAULT NULL")
         conn.commit()
 
 
@@ -191,6 +194,15 @@ def update_last_notified(chat_id):
         conn.execute(
             "UPDATE users SET last_notified_at=CURRENT_TIMESTAMP WHERE chat_id=?", (chat_id,)
         )
+        conn.commit()
+
+
+def set_onboarding_step(chat_id, step):
+    """step is one of 'keywords', 'location', 'region', or None (not in
+    onboarding — either finished it, or a pre-existing user from before
+    this feature who never needed to)."""
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET onboarding_step=? WHERE chat_id=?", (step, chat_id))
         conn.commit()
 
 

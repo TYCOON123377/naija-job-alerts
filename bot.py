@@ -41,6 +41,8 @@ from telegram.ext import (
     CommandHandler,
     CallbackQueryHandler,
     ContextTypes,
+    MessageHandler,
+    filters,
 )
 
 import storage
@@ -59,19 +61,122 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+REGION_LABELS = {
+    "nigeria": "Nigeria-based jobs only 🇳🇬",
+    "remote": "Remote/international jobs only 🌍",
+    "freelance": "Freelance projects only 💼",
+    "both": "Everything (Nigeria, remote, and freelance) 🇳🇬🌍💼",
+}
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    New users get walked through setup one question at a time instead of a
+    wall of slash-command syntax — feels like chatting, not reading a
+    manual. Progress lives in users.onboarding_step (not in memory) since
+    the Vercel-hosted deployment builds a fresh Application per webhook
+    request; see handle_text and onboard_region_callback for the rest of
+    the flow, and github_sync.py for how this state gets shared with
+    poll_once.py's GitHub Actions checkout.
+
+    Returning users (row already exists, onboarding finished or never
+    needed — pre-existing accounts from before this feature both have
+    onboarding_step=NULL) just get a short welcome-back instead of being
+    forced through setup again.
+    """
     chat_id = update.effective_chat.id
+    existing = storage.get_user(chat_id)
+
+    if existing is not None and existing["onboarding_step"] is None:
+        await update.message.reply_text(
+            "Welcome back! 👋 Your alerts are already running.\n"
+            "Send /status to see your settings, or /help for everything I can do."
+        )
+        return
+
     storage.upsert_user(chat_id)
+    storage.set_onboarding_step(chat_id, "keywords")
     await update.message.reply_text(
-        "Welcome to Naija Job Alerts 🇳🇬🌍\n\n"
-        "I'll ping you the moment a matching job is posted — Nigeria-based AND "
-        "legit remote/international roles, free, real-time, no spam.\n\n"
-        "Set what you want:\n"
-        "  /keywords developer, sales, remote\n"
-        "  /location Lagos   (or /location any)\n"
-        "  /region nigeria   (or /region remote, /region freelance, or /region both — default)\n\n"
-        "Check anytime with /status. Pause with /pause, resume with /resume."
+        "Hey! 👋 I'm Naija Job Alerts — free real-time job alerts from 14 "
+        "sources across Nigeria, remote work, and freelance gigs.\n\n"
+        "Let's get you set up, just answer like you're texting a friend.\n\n"
+        "What kind of jobs are you looking for? (e.g. developer, sales, "
+        "accounting — or say \"anything\" if you're not picky)"
+    )
+
+
+async def _advance_to_location(chat_id, context):
+    """Shared by handle_text (typed keywords) and category_callback (tapped
+    a category button) — both are ways to answer the onboarding "what jobs"
+    question, so both should ask the same next question the same way."""
+    storage.set_onboarding_step(chat_id, "location")
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text="Got it! 👍 Which state are you in? Or just say \"any\" if it doesn't matter.",
+    )
+
+
+async def _advance_to_region(chat_id, context):
+    storage.set_onboarding_step(chat_id, "region")
+    buttons = [
+        [InlineKeyboardButton("🇳🇬 Nigeria only", callback_data="onboard_region:nigeria")],
+        [InlineKeyboardButton("🌍 Remote only", callback_data="onboard_region:remote")],
+        [InlineKeyboardButton("💼 Freelance only", callback_data="onboard_region:freelance")],
+        [InlineKeyboardButton("✨ Everything", callback_data="onboard_region:both")],
+    ]
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text="Last one — what kind of jobs do you want?",
+        reply_markup=InlineKeyboardMarkup(buttons),
+    )
+
+
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Catches plain-text replies during onboarding (see start()). Outside
+    onboarding, a plain-text message isn't something this bot knows what to
+    do with — everything else is a slash command — so it just points
+    people at /help instead of silently ignoring them."""
+    chat_id = update.effective_chat.id
+    user = storage.get_user(chat_id)
+    text = update.message.text.strip()
+
+    if user is None or user["onboarding_step"] is None:
+        await update.message.reply_text(
+            "Not sure what to do with that — try /help to see what I understand, "
+            "or /status to check your current settings."
+        )
+        return
+
+    step = user["onboarding_step"]
+
+    if step == "keywords":
+        keywords = "" if text.lower() in ("anything", "any", "everything") else text
+        storage.upsert_user(chat_id, keywords=keywords)
+        await _advance_to_location(chat_id, context)
+        return
+
+    if step == "location":
+        location = "any" if text.lower() in ("any", "anywhere") else text
+        storage.upsert_user(chat_id, location=location)
+        await _advance_to_region(chat_id, context)
+        return
+
+    # step == "region": they're mid-way through tapping a button, not typing.
+    await update.message.reply_text("Tap one of the buttons above to finish setting up. 👆")
+
+
+async def onboard_region_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    chat_id = update.effective_chat.id
+    region = query.data.split(":", 1)[1]
+    storage.upsert_user(chat_id, region=region)
+    storage.set_onboarding_step(chat_id, None)
+    await query.edit_message_text(
+        f"✅ All set! Region: {REGION_LABELS[region]}\n\n"
+        "I'll ping you the moment something matches — usually within 15 minutes "
+        "of it going live. Send /status anytime to check your settings, /pause "
+        "to stop, or /help to see everything else I can do."
     )
 
 
@@ -113,6 +218,12 @@ async def category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     storage.upsert_user(chat_id, keywords=keywords)
     await query.edit_message_text(f"✅ {label} selected. Keywords set to: {keywords}")
 
+    # Mid-onboarding: tapping a category is an alternative to typing
+    # keywords, so it should advance the guided setup the same way.
+    user = storage.get_user(chat_id)
+    if user is not None and user["onboarding_step"] == "keywords":
+        await _advance_to_location(update, context, chat_id)
+
 
 async def set_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -144,13 +255,7 @@ async def set_region(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     region = context.args[0].lower()
     storage.upsert_user(chat_id, region=region)
-    labels = {
-        "nigeria": "Nigeria-based jobs only 🇳🇬",
-        "remote": "Remote/international jobs only 🌍",
-        "freelance": "Freelance projects only 💼",
-        "both": "Everything (Nigeria, remote, and freelance) 🇳🇬🌍💼",
-    }
-    await update.message.reply_text(f"✅ Region set to: {labels[region]}")
+    await update.message.reply_text(f"✅ Region set to: {REGION_LABELS[region]}")
 
 
 async def set_quiet(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -312,6 +417,8 @@ def build_application():
     app.add_handler(CommandHandler("keywords", set_keywords))
     app.add_handler(CommandHandler("categories", categories))
     app.add_handler(CallbackQueryHandler(category_callback, pattern="^cat:"))
+    app.add_handler(CallbackQueryHandler(onboard_region_callback, pattern="^onboard_region:"))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(CommandHandler("location", set_location))
     app.add_handler(CommandHandler("region", set_region))
     app.add_handler(CommandHandler("quiet", set_quiet))
