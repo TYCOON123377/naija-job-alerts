@@ -1,21 +1,25 @@
 # Naija Job Alerts — Telegram Bot (MVP)
 
-Real-time job alerts for Nigeria — local AND legit remote/international
-roles. Zero-spend stack: free RSS data sources, free Telegram Bot API,
-free SQLite storage, free hosting via GitHub Actions.
+Real-time job alerts for Nigeria — local roles, legit remote/international
+jobs, and freelance gigs. Zero-spend stack: free RSS/API/scrape sources,
+free Telegram Bot API, free SQLite storage, free hosting (GitHub Actions
+for polling, Vercel for the command bot).
 
 ## How it works
 
-1. Every 15 minutes, the alerting workflow polls four confirmed-live, free
-   RSS sources: MyJobMag, HotNigerianJobs (Nigeria-based), and We Work
-   Remotely (remote/international — genuinely remote roles, not relocation
-   listings).
-2. New jobs are de-duplicated both within and **across** feeds (the same
-   vacancy often gets posted to both Nigeria boards with slightly different
+1. Every 15 minutes, the alerting workflow pulls from 14 free sources
+   across three kinds: RSS feeds (MyJobMag, HotNigerianJobs, Jobzilla,
+   We Work Remotely, Jobicy, Freelancer.com), public Greenhouse job-board
+   APIs (Moniepoint, plus remote-only roles at GitLab/Stripe/Webflow), and
+   public Telegram job-alert channels (see `config.py` for the full list
+   and per-source notes on throttling/terms).
+2. New jobs are de-duplicated within each source (the same vacancy often
+   gets posted to multiple Nigeria boards with slightly different
    company-name wording — matched and merged so you're not alerted twice).
 3. Jobs posted within the last `MAX_JOB_AGE_HOURS` are matched against each
-   user's saved keywords, state/location, and region preference (Nigeria
-   only / remote only / both — see `/region` below).
+   user's saved keywords (comma-separated, prefix a word with `-` to
+   exclude it), state/location, and region preference (Nigeria / remote /
+   freelance / both — see `/region` below).
 4. Matches get pushed as a Telegram message — bundled into a single digest
    if there are more than `DIGEST_THRESHOLD` matches in one poll, so an
    active period doesn't flood anyone's chat.
@@ -106,7 +110,8 @@ a backlog dump:
 - `/location Lagos` — set a state filter, or `/location any` for everywhere
   (only applies to Nigeria-region jobs — remote jobs aren't state-bound)
 - `/region nigeria` — Nigeria-based jobs only
-- `/region remote` — remote/international jobs only (We Work Remotely)
+- `/region remote` — remote/international jobs only
+- `/region freelance` — freelance projects only (Freelancer.com)
 - `/region both` — everything (default)
 - `/quiet 22 7` — hold alerts from 10pm-7am WAT, delivered as one digest
   when the window ends; `/quiet off` to disable
@@ -168,23 +173,50 @@ users a right to erasure.
 
 The alerting half needs no hosting at all (see Architecture above) — this
 section is only about where `bot.py` runs to answer `/keywords` etc.
-**Correction from earlier advice:** Railway's ongoing free tier is gone
-(now a one-time $5 trial credit) and Render's Background Workers now start
-at $7/month — neither is actually free anymore as of 2026. Genuinely free
-options for this specific piece:
 
-- **Oracle Cloud "Always Free" tier** — a real always-on micro VM, free
-  indefinitely (not a trial), no card charged unless you explicitly
-  upgrade. The most durable free option here; slightly more setup (SSH in,
-  run `bot.py` under a process manager like `systemd` or `tmux`).
-- **A spare always-on device you already have** — an old phone with
-  Termux, a Raspberry Pi, a PC that's on anyway. Zero marginal cost.
-- **Render's free Web Service tier** (not Background Worker) — free tier
-  services sleep after inactivity and take ~1 minute to wake on the next
-  request. Workable for a low-traffic command bot if you switch it to
-  **webhook mode** instead of `run_polling()`, since a webhook just needs
-  to respond when Telegram calls it, not stay awake polling in a loop.
-  This requires a small code change from what's here — ask if you want it.
+**This project actually runs on Vercel**, via webhook mode instead of
+`run_polling()` — Telegram POSTs each update to `api/webhook.py` (a
+stateless serverless function) instead of the bot staying awake polling
+for messages. That's what makes a free, sleep-free host possible here.
+
+Since Vercel's filesystem is read-only outside `/tmp`, and a fresh
+invocation can land on a different instance with an empty `/tmp`, user
+state can't just live in a local file the way it does for `poll_once.py`
+(which runs on a GitHub Actions checkout that already commits
+`data/jobs.db` back to the repo). Instead, `github_sync.py` pulls the
+latest `data/jobs.db` from GitHub before handling an update and pushes it
+back after if anything changed — see that file's docstring for the
+409-conflict retry logic (handles the rare case where the poll workflow
+commits at the same moment).
+
+**Setup**, beyond the steps above:
+1. Import this repo into Vercel (vercel.com → New Project → your GitHub
+   account, no card required for the Hobby tier)
+2. Add these environment variables in the Vercel project settings:
+   - `JOB_BOT_TOKEN` — same token as the GitHub Actions secret
+   - `JOBS_DB_PATH` — set to `/tmp/jobs.db`
+   - `WEBHOOK_SECRET` — any random string, checked against Telegram's
+     `X-Telegram-Bot-Api-Secret-Token` header so random requests can't
+     trigger a GitHub pull/push
+   - `GITHUB_REPO` — `owner/repo` for this repository
+   - `GITHUB_TOKEN` — a fine-grained GitHub PAT scoped to just this repo,
+     Contents permission set to Read and write
+3. Deploy, then register the webhook once via Telegram's API:
+   ```bash
+   curl "https://api.telegram.org/bot<JOB_BOT_TOKEN>/setWebhook" \
+     -d "url=https://<your-project>.vercel.app/api/webhook" \
+     -d "secret_token=<WEBHOOK_SECRET>"
+   ```
+
+**Alternatives**, if you'd rather not depend on Vercel + GitHub API calls
+per command: `bot.py`'s original `run_polling()` / `main()` path still
+works unmodified on an always-on host — Oracle Cloud's "Always Free" tier
+(a real free-forever micro VM, no card charged unless you upgrade) or any
+spare always-on device (old phone with Termux, a Raspberry Pi) — just
+`pip install -r requirements.txt`, export `JOB_BOT_TOKEN`, run `python
+bot.py` under `systemd` or `tmux`. No `github_sync`/webhook plumbing
+needed for that path since the process's local `data/jobs.db` just stays
+put between commands.
 
 Set `JOB_BOT_TOKEN` as an environment variable wherever you run it — never
 commit it to code (the GitHub Actions secret from setup step 4 is separate
@@ -270,10 +302,23 @@ ad-tolerant markets.
 
 ## Known limitations (MVP, by design)
 
-- Four data sources for now (MyJobMag, HotNigerianJobs, We Work Remotely).
-  Good combined coverage across local + remote, but not exhaustive.
-- Matching is keyword substring — no fuzzy matching or ranking yet.
+- 14 data sources across RSS, Greenhouse's public API, and Telegram
+  channels (see `config.py`). Good combined coverage across Nigeria,
+  remote, and freelance work, but not exhaustive — e.g. no source yet for
+  non-remote jobs requiring relocation abroad (most boards for that
+  dropped free RSS access), and several major Nigerian companies
+  (Flutterwave, Paystack, Kuda, etc.) don't run Greenhouse/Lever so
+  there's no API to pull from.
+- Matching is keyword substring (with `-word` exclusion) — no fuzzy
+  matching or ranking yet.
+- The Telegram-channel source is unofficial HTML scraping of Telegram's
+  public share-preview page, not a documented API — the most fragile
+  source here; a Telegram page-layout change could silently break it.
+- Cross-source duplicate detection only happens within a single source
+  (e.g. across MyJobMag's two feeds), not between different sources —
+  measured in practice at under 0.3% of jobs, so not worth the added
+  complexity of a global dedup pass yet.
 - The command bot (`bot.py`) still needs *something* always-on, even though
   alerting doesn't — see "Free hosting for the command bot" above.
-- Remotive deliberately excluded — their terms prohibit exactly this use
-  case (see `config.py` comment).
+- Remotive and Himalayas deliberately excluded — both feeds' terms
+  prohibit exactly this use case (see `config.py` comment).

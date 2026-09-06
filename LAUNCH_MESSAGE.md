@@ -9,9 +9,9 @@ Copy-paste ready. Swap `@YourBotUsername` for your actual bot's username
 
 🇳🇬 Free real-time job alerts, straight to Telegram.
 
-No app to download, no LinkedIn premium, no scrolling Jobberman all day.
-Tell it what you want — role, state, or "remote only" for dollar-paying
-international jobs — and it pings you the moment a match drops.
+No app to download, no LinkedIn premium, no scrolling ten different sites
+all day. Tell it what you want — role, state, remote-only, or freelance
+gigs — and it pings you the moment a match drops, from 14 sources at once.
 
 100% free. @YourBotUsername
 
@@ -19,21 +19,23 @@ international jobs — and it pings you the moment a match drops.
 
 ## Longer version (WhatsApp groups, tech community posts)
 
-Built a free Telegram bot that sends real-time job alerts — for Nigeria-based
-roles AND legit remote/international jobs in one place.
+Built a free Telegram bot that sends real-time job alerts — Nigeria-based
+roles, legit remote/international jobs, and freelance gigs, all in one place.
 
 How it works:
 1. Message @YourBotUsername, hit /start
-2. Tell it what you want: /keywords developer, sales, remote
+2. Tell it what you want: /keywords developer, sales, -junior
+   (yes, you can exclude words too)
 3. Pick a state or "any": /location Lagos
-4. Choose local jobs, remote jobs, or both: /region both
+4. Choose local, remote, freelance, or all of it: /region both
 
-That's it — no more refreshing Jobberman five times a day. It checks fresh
-listings every 15 minutes and only pings you when something actually
-matches what you asked for.
+That's it — no more refreshing five job boards a day. It checks 14 sources
+every 15 minutes — Nigerian job boards, Telegram job-alert channels, big
+remote-first companies' own career pages, and Freelancer.com — and only
+pings you when something actually matches what you asked for.
 
 Completely free, no ads, no premium tier. Built it because I was tired of
-manually checking four different job boards every morning.
+manually checking job boards every morning.
 
 @YourBotUsername
 
@@ -41,15 +43,17 @@ manually checking four different job boards every morning.
 
 ## For a Twitter/X thread (if you want to go longer)
 
-1/ Spent the weekend building something I actually needed: a job alert bot
-that doesn't require checking five different sites every morning.
+1/ Spent some time building something I actually needed: a job alert bot
+that doesn't require checking ten different sites every morning.
 
-2/ It watches MyJobMag, HotNigerianJobs, and We Work Remotely — Nigeria
-listings AND legit remote/international roles — and pushes matches to
-Telegram the second they're posted.
+2/ It watches Nigerian job boards, Telegram job-alert channels, remote-first
+companies' own career pages (GitLab, Stripe, Webflow), and Freelancer.com
+for gigs — 14 sources total — and pushes matches to Telegram the second
+they're posted.
 
-3/ Set your keywords, your state (or "any"), and whether you want local
-jobs, remote jobs, or both. That's the whole setup.
+3/ Set your keywords (exclude words with a "-" prefix), your state (or
+"any"), and whether you want local jobs, remote jobs, freelance gigs, or
+everything. That's the whole setup.
 
 4/ Free. No premium tier, no ads, no "upgrade to see who viewed your
 profile" nonsense. Try it: @YourBotUsername
