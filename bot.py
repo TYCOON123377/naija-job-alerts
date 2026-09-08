@@ -89,15 +89,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     chat_id = update.effective_chat.id
     existing = storage.get_user(chat_id)
+    tg_user = update.effective_user
 
     if existing is not None and existing["onboarding_step"] is None:
+        storage.upsert_user(chat_id, username=tg_user.username, first_name=tg_user.first_name)
         await update.message.reply_text(
             "Welcome back! 👋 Your alerts are already running.\n"
             "Send /status to see your settings, or /help for everything I can do."
         )
         return
 
-    storage.upsert_user(chat_id)
+    storage.upsert_user(chat_id, username=tg_user.username, first_name=tg_user.first_name)
     storage.set_onboarding_step(chat_id, "keywords")
     await update.message.reply_text(
         "Good day. I am 9.j.a, developed by Master Tosin to give you a "
@@ -437,6 +439,27 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines))
 
 
+async def subscribers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if ADMIN_CHAT_ID is None or chat_id != ADMIN_CHAT_ID:
+        return  # silently ignore for non-owners — don't reveal the command exists
+
+    rows = storage.list_users(limit=50)
+    if not rows:
+        await update.message.reply_text("No subscribers yet.")
+        return
+
+    lines = [f"👥 Last {len(rows)} subscriber(s) (most recent first):", ""]
+    for r in rows:
+        name = r["first_name"] or "(no name)"
+        handle = f" @{r['username']}" if r["username"] else ""
+        state = "active" if r["active"] else "paused"
+        joined = r["joined_at"] or "unknown"
+        lines.append(f"{name}{handle} — {r['region']}, {state} — joined {joined}")
+
+    await update.message.reply_text("\n".join(lines))
+
+
 async def send_heartbeat(context: ContextTypes.DEFAULT_TYPE):
     """
     Pings a free healthchecks.io URL on a schedule. If this bot process
@@ -481,6 +504,7 @@ def build_application():
     app.add_handler(CommandHandler("resume", resume))
     app.add_handler(CommandHandler("deleteme", deleteme))
     app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CommandHandler("subscribers", subscribers))
     return app
 
 

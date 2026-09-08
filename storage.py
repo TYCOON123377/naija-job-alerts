@@ -25,7 +25,10 @@ def init_db():
                 quiet_start INTEGER DEFAULT NULL,
                 quiet_end INTEGER DEFAULT NULL,
                 last_notified_at TEXT DEFAULT NULL,
-                onboarding_step TEXT DEFAULT NULL
+                onboarding_step TEXT DEFAULT NULL,
+                username TEXT DEFAULT NULL,
+                first_name TEXT DEFAULT NULL,
+                joined_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
         conn.execute("""
@@ -67,6 +70,12 @@ def init_db():
             conn.execute("ALTER TABLE users ADD COLUMN last_notified_at TEXT DEFAULT NULL")
         if "onboarding_step" not in cols:
             conn.execute("ALTER TABLE users ADD COLUMN onboarding_step TEXT DEFAULT NULL")
+        if "username" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN username TEXT DEFAULT NULL")
+        if "first_name" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN first_name TEXT DEFAULT NULL")
+        if "joined_at" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN joined_at TEXT DEFAULT NULL")
         conn.commit()
 
 
@@ -80,14 +89,20 @@ def get_conn():
         conn.close()
 
 
-def upsert_user(chat_id, keywords=None, location=None, region=None, quiet_start=None, quiet_end=None):
+def upsert_user(
+    chat_id, keywords=None, location=None, region=None, quiet_start=None, quiet_end=None,
+    username=None, first_name=None,
+):
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM users WHERE chat_id=?", (chat_id,)).fetchone()
         if row is None:
             conn.execute(
-                "INSERT INTO users (chat_id, keywords, location, region, active, quiet_start, quiet_end) "
-                "VALUES (?, ?, ?, ?, 1, ?, ?)",
-                (chat_id, keywords or "", location or "", region or "both", quiet_start, quiet_end),
+                "INSERT INTO users "
+                "(chat_id, keywords, location, region, active, quiet_start, quiet_end, "
+                "username, first_name, joined_at) "
+                "VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                (chat_id, keywords or "", location or "", region or "both", quiet_start, quiet_end,
+                 username, first_name),
             )
         else:
             if keywords is not None:
@@ -100,6 +115,12 @@ def upsert_user(chat_id, keywords=None, location=None, region=None, quiet_start=
                 conn.execute("UPDATE users SET quiet_start=? WHERE chat_id=?", (quiet_start, chat_id))
             if quiet_end is not None:
                 conn.execute("UPDATE users SET quiet_end=? WHERE chat_id=?", (quiet_end, chat_id))
+            # Username/name can change on Telegram's side, so keep these fresh
+            # on every /start rather than only setting them once at signup.
+            if username is not None:
+                conn.execute("UPDATE users SET username=? WHERE chat_id=?", (username, chat_id))
+            if first_name is not None:
+                conn.execute("UPDATE users SET first_name=? WHERE chat_id=?", (first_name, chat_id))
         conn.commit()
 
 
@@ -272,6 +293,18 @@ def set_feed_last_fetched(url, epoch):
             (url, epoch),
         )
         conn.commit()
+
+
+def list_users(limit=50):
+    """Most-recently-joined users first, for the owner-only /subscribers
+    roster. joined_at is NULL for accounts that existed before this
+    tracking was added -- shown as unknown rather than guessed."""
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT chat_id, username, first_name, region, active, joined_at FROM users "
+            "ORDER BY joined_at IS NULL, joined_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
 
 
 def get_usage_stats():
